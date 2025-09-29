@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Neural Search API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neural-search-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - INDEX_TYPE=hnsw
+      - EMBEDDING_MODEL=all-MiniLM-L6-v2
+      - LOG_LEVEL=info
+    volumes:
+      - ./data:/data
+      - ./logs:/logs
+    restart: unless-stopped
+    networks:
+      - neural-search-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Dashboard Frontend
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: neural-search-dashboard
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - neural-search-network
+    restart: unless-stopped
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: neural-search-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - neural-search-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Prometheus for monitoring (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: neural-search-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployment/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - neural-search-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: neural-search-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployment/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - neural-search-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+networks:
+  neural-search-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
