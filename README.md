@@ -81,4 +81,16 @@ neural-search/
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
+```
+## Installation
 
+### Using Docker (Recommended)
+
+
+# Start all services
+docker-compose up -d
+
+## Installation (Without Docker)
+
+### Install dependencies
+pip install -r requirements.txt
